@@ -61,7 +61,25 @@ def read_waves_wide(file_name: str) -> pl.DataFrame:
     return df
 
 
-# Applying masks
+def read_waves_deep(file_name: str) -> pl.DataFrame:
+    df = pl.read_parquet(file_name)
+    df = df.filter(pl.col("zobs") < 0.8)
+    df = df.filter(pl.col("total_ap_dust_Z_VISTA") < 21.25)
+    return df
+
+
+def create_pv_cloud(
+    ra: np.ndarray, dec: np.ndarray, redshift: np.ndarray
+) -> pv.PolyData:
+    cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+    distances = cosmo.comoving_distance(redshift)
+    c = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, distance=distances)
+    x = c.cartesian.x.value
+    y = c.cartesian.y.value
+    z = c.cartesian.z.value
+    points = np.column_stack((x, y, z))
+    return pv.PolyData(points)
+
 
 if __name__ == "__main__":
     INFILE_GAIA_MASKS = "masks/gaiastarmaskwaves.csv"
@@ -69,6 +87,10 @@ if __name__ == "__main__":
     INFILE_MOCK_WIDE = (
         "~/Desktop/mock_catalogs/offical_waves_mocks/v0.4.0/waves_wide_gals.parquet"
     )
+    INFILE_MOCK_DEEP = (
+        "~/Desktop/mock_catalogs/offical_waves_mocks/v0.4.0/waves_deep_gals.parquet"
+    )
+
     polygon_files = glob.glob("masks/MaskPolygons_v1/*.csv")
 
     polygons = read_polygons(polygon_files)
@@ -76,6 +98,7 @@ if __name__ == "__main__":
     stars = read_gaia_star_mask(INFILE_GAIA_MASKS)
 
     waves_wide = read_waves_wide(INFILE_MOCK_WIDE)
+    waves_deep = read_waves_deep(INFILE_MOCK_DEEP)
 
     ras, decs, zobs, zcos = (
         waves_wide["ra"].to_numpy(),
@@ -83,6 +106,13 @@ if __name__ == "__main__":
         waves_wide["zobs"].to_numpy(),
         waves_wide["zcos"].to_numpy(),
     )
+    ras_deep, decs_deep, zobs_deep, zcos_deep = (
+        waves_deep["ra"].to_numpy(),
+        waves_deep["dec"].to_numpy(),
+        waves_deep["zobs"].to_numpy(),
+        waves_deep["zcos"].to_numpy(),
+    )
+
     tic = datetime.datetime.now()
     mask_ghosts = np.array(apply_apertures(ras, decs, ghosts))
     mask_stars = np.array(apply_apertures(ras, decs, stars))
@@ -93,46 +123,13 @@ if __name__ == "__main__":
     regions = np.array([mask_stars, mask_ghosts, mask_polygons])
     masked = np.array([any(region) for region in regions.T])
     not_masked = ~masked
-    print("here 1")
-    # plot
-    # plt.scatter(ras[not_masked], decs[not_masked], color="k", s=0.1)
-    # plt.show()
-    cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
-    c_obs = SkyCoord(
-        ra=ras[not_masked] * u.deg,
-        dec=decs[not_masked] * u.deg,
-        distance=cosmo.comoving_distance(zobs[not_masked]),
+
+    cloud_unmasked = create_pv_cloud(
+        ras[not_masked], decs[not_masked], zcos[not_masked]
     )
-    c_obs_masked = SkyCoord(
-        ra=ras[masked] * u.deg,
-        dec=decs[masked] * u.deg,
-        distance=cosmo.comoving_distance(zobs[masked]),
-    )
-    c_cos = SkyCoord(
-        ra=ras[not_masked] * u.deg,
-        dec=decs[not_masked] * u.deg,
-        distance=cosmo.comoving_distance(zcos[not_masked]),
-    )
-    x_obs = c_obs.cartesian.x.value
-    y_obs = c_obs.cartesian.y.value
-    z_obs = c_obs.cartesian.z.value
+    cloud_masked = create_pv_cloud(ras[masked], decs[masked], zcos[masked])
+    cloud_deep = create_pv_cloud(ras_deep, decs_deep, zcos_deep)
 
-    x_obs_masked = c_obs_masked.cartesian.x.value
-    y_obs_masked = c_obs_masked.cartesian.y.value
-    z_obs_masked = c_obs_masked.cartesian.z.value
-
-    x_cos = c_cos.cartesian.x.value
-    y_cos = c_cos.cartesian.y.value
-    z_cos = c_cos.cartesian.z.value
-    print("here 2")
-    # Create PyVista 3D scatter plot with both masked and unmasked
-    points_unmasked = np.column_stack((x_obs, y_obs, z_obs))
-    cloud_unmasked = pv.PolyData(points_unmasked)
-
-    points_masked = np.column_stack((x_obs_masked, y_obs_masked, z_obs_masked))
-    cloud_masked = pv.PolyData(points_masked)
-
-    print("here 3")
     plotter = pv.Plotter()
     plotter.add_points(
         cloud_unmasked,
@@ -148,7 +145,6 @@ if __name__ == "__main__":
         render_points_as_spheres=False,
         label="Masked",
     )
-    print("here 4")
     plotter.add_title("Galaxy Distribution (Black=Unmasked, Red=Masked)", font_size=12)
     plotter.add_legend()
     plotter.show_axes()
@@ -158,8 +154,26 @@ if __name__ == "__main__":
     plotter.add_points(
         cloud_masked,
         color="red",
-        point_size=10,
+        point_size=3,
         render_points_as_spheres=False,
         label="Masked",
     )
+    plotter.show()
+
+    plotter = pv.Plotter()
+    plotter.add_points(
+        cloud_unmasked,
+        color="black",
+        point_size=1.0,
+        render_points_as_spheres=False,
+        label="Unmasked",
+    )
+    plotter.add_points(
+        cloud_deep,
+        color="red",
+        point_size=1.0,
+        render_points_as_spheres=False,
+        label="Masked",
+    )
+    plotter.add_title("Galaxy Distribution (Black=Unmasked, Red=Masked)", font_size=12)
     plotter.show()
