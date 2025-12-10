@@ -81,14 +81,26 @@ def create_pv_cloud(
     return pv.PolyData(points)
 
 
+def split_deep_and_wide(
+    total_file: str,
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    df = pl.read_parquet(total_file)
+    waves_wide = df.filter(pl.col("zobs") < 0.2)
+    waves_wide = waves_wide.filter(pl.col("total_ap_dust_Z_VISTA") < 21.2)
+    waves_deep = df.filter((pl.col("ra") > 360 - 21) & (pl.col("ra") < 360 - 9))
+    waves_deep = waves_deep.filter((pl.col("dec") > -35) & (pl.col("dec") < -30))
+    waves_deep = waves_deep.filter(pl.col("zobs") < 0.8)
+    waves_deep = waves_deep.filter(pl.col("total_ap_dust_Z_VISTA") < 21.25)
+    combined = waves_wide.vstack(waves_deep)
+    combined = combined.unique()
+    return waves_wide, waves_deep, combined
+
+
 if __name__ == "__main__":
     INFILE_GAIA_MASKS = "masks/gaiastarmaskwaves.csv"
     INFILE_GHOST_MASKS = "masks/GhostLocations_v0.csv"
     INFILE_MOCK_WIDE = (
-        "~/Desktop/mock_catalogs/offical_waves_mocks/v0.4.0/waves_wide_gals.parquet"
-    )
-    INFILE_MOCK_DEEP = (
-        "~/Desktop/mock_catalogs/offical_waves_mocks/v0.4.0/waves_deep_gals.parquet"
+        "~/Desktop/mock_catalogs/custom_waves_requests/waves_wide_gals.parquet"
     )
 
     polygon_files = glob.glob("masks/MaskPolygons_v1/*.csv")
@@ -97,10 +109,9 @@ if __name__ == "__main__":
     ghosts = read_ghosts(INFILE_GHOST_MASKS)
     stars = read_gaia_star_mask(INFILE_GAIA_MASKS)
 
-    waves_wide = read_waves_wide(INFILE_MOCK_WIDE)
-    waves_deep = read_waves_deep(INFILE_MOCK_DEEP)
+    waves_wide, waves_deep, combined = split_deep_and_wide(INFILE_MOCK_WIDE)
 
-    ras, decs, zobs, zcos = (
+    ras_wide, decs_wide, zobs_wide, zcos_wide = (
         waves_wide["ra"].to_numpy(),
         waves_wide["dec"].to_numpy(),
         waves_wide["zobs"].to_numpy(),
@@ -112,11 +123,17 @@ if __name__ == "__main__":
         waves_deep["zobs"].to_numpy(),
         waves_deep["zcos"].to_numpy(),
     )
+    ras_comb, decs_comb, zobs_comb, zcos_comb = (
+        combined["ra"].to_numpy(),
+        combined["dec"].to_numpy(),
+        combined["zobs"].to_numpy(),
+        combined["zcos"].to_numpy(),
+    )
 
     tic = datetime.datetime.now()
-    mask_ghosts = np.array(apply_apertures(ras, decs, ghosts))
-    mask_stars = np.array(apply_apertures(ras, decs, stars))
-    mask_polygons = np.array(apply_polygons(ras, decs, polygons))
+    mask_ghosts = np.array(apply_apertures(ras_comb, decs_comb, ghosts))
+    mask_stars = np.array(apply_apertures(ras_comb, decs_comb, stars))
+    mask_polygons = np.array(apply_polygons(ras_comb, decs_comb, polygons))
     toc = datetime.datetime.now()
     print(f"time: {toc - tic}")
 
@@ -125,9 +142,11 @@ if __name__ == "__main__":
     not_masked = ~masked
 
     cloud_unmasked = create_pv_cloud(
-        ras[not_masked], decs[not_masked], zcos[not_masked]
+        ras_comb[not_masked], decs_comb[not_masked], zcos_comb[not_masked]
     )
-    cloud_masked = create_pv_cloud(ras[masked], decs[masked], zcos[masked])
+    cloud_masked = create_pv_cloud(
+        ras_comb[masked], decs_comb[masked], zcos_comb[masked]
+    )
     cloud_deep = create_pv_cloud(ras_deep, decs_deep, zcos_deep)
 
     plotter = pv.Plotter()
