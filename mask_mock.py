@@ -85,11 +85,11 @@ def split_deep_and_wide(
     total_file: str,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     df = pl.read_parquet(total_file)
-    waves_wide = df.filter(pl.col("zobs") < 0.2)
+    waves_wide = df.filter(pl.col("zobs") < 0.5)
     waves_wide = waves_wide.filter(pl.col("total_ap_dust_Z_VISTA") < 21.2)
     waves_deep = df.filter((pl.col("ra") > 360 - 21) & (pl.col("ra") < 360 - 9))
     waves_deep = waves_deep.filter((pl.col("dec") > -35) & (pl.col("dec") < -30))
-    waves_deep = waves_deep.filter(pl.col("zobs") < 0.8)
+    waves_deep = waves_deep.filter(pl.col("zobs") < 1.0)
     waves_deep = waves_deep.filter(pl.col("total_ap_dust_Z_VISTA") < 21.25)
     combined = waves_wide.vstack(waves_deep)
     combined = combined.unique()
