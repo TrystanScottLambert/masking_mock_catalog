@@ -85,7 +85,7 @@ def split_deep_and_wide(
     total_file: str,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     df = pl.read_parquet(total_file)
-    waves_wide = df.filter(pl.col("zobs") < 0.5)
+    waves_wide = df.filter(pl.col("zobs") < 0.3)
     waves_wide = waves_wide.filter(pl.col("total_ap_dust_Z_VISTA") < 21.2)
     waves_deep = df.filter((pl.col("ra") > 360 - 21) & (pl.col("ra") < 360 - 9))
     waves_deep = waves_deep.filter((pl.col("dec") > -35) & (pl.col("dec") < -30))
@@ -148,7 +148,8 @@ if __name__ == "__main__":
         ras_comb[masked], decs_comb[masked], zcos_comb[masked]
     )
     cloud_deep = create_pv_cloud(ras_deep, decs_deep, zcos_deep)
-
+    combined = combined.with_columns(pl.Series("masked", masked))
+    combined.write_parquet("combined.parquet")
     plotter = pv.Plotter()
     plotter.add_points(
         cloud_unmasked,
