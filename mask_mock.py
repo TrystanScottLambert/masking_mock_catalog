@@ -13,7 +13,7 @@ from astropy.cosmology import FlatLambdaCDM
 from regionx import Aperture, Polygon, apply_apertures, apply_polygons
 
 
-FAINTEST_STAR_TO_BE_MASKED = 16 # Change to match documentation
+FAINTEST_STAR_TO_BE_MASKED = 16 # Change to match WAVES input catalog paper
 BRIGHTEST_STAR_TO_BE_MASKED = 3.5
 
 
@@ -23,7 +23,7 @@ def calculate_radii(magnitudes: np.ndarray) -> np.ndarray:
     Calculates the radii based on the magnitude.
     """
     cut = np.where(magnitudes > BRIGHTEST_STAR_TO_BE_MASKED)[0]
-    raddii = np.full_like(magnitudes, 7., dtype=np.float64) # Change to float64 from int
+    raddii = np.full_like(magnitudes, 7.) # Change to float64 from int
     raddii[cut] = 10 ** (1.3 - 0.13 * magnitudes[cut])
     return raddii / 60
 
@@ -43,7 +43,14 @@ def read_ghosts(file_name: str) -> list[Aperture]:
     return [Aperture(_ra, _dec, _rad / 60) for _ra, _dec, _rad in zip(ra, dec, radius)]
 
 
-def read_waves_s_extras(file_name: str) -> list[Aperture]:
+def read_globular_cluster(file_name: str) -> list[Aperture]:
+    ra, dec, radius = np.loadtxt(
+        file_name, unpack=True, skiprows=1, usecols=(0, 1, 2), delimiter=","
+    )
+    return [Aperture(_ra, _dec, _rad) for _ra, _dec, _rad in zip(ra, dec, radius)]
+
+
+def read_large_stars(file_name: str) -> list[Aperture]:
     ra, dec, radius = np.loadtxt(
         file_name, unpack=True, skiprows=1, usecols=(0, 1, 2), delimiter=","
     )
@@ -106,7 +113,8 @@ def split_deep_and_wide(
 if __name__ == "__main__":
     INFILE_GAIA_MASKS = "masks/gaiastarmaskwaves.csv"
     INFILE_GHOST_MASKS = "masks/GhostLocations_v0.csv"
-    INFILE_WAVES_S_EXTRAS = "masks/waves_s_extras.csv"
+    INFILE_WAVES_SOUTH_GLOBULAR_CLUSTER = "masks/waves_south_globular_cluster.csv"
+    INFILE_WAVES_SOUTH_LARGE_STARS = "masks/waves_south_large_stars.csv"
     INFILE_MOCK_WIDE = (
         "~/Desktop/mock_catalogs/custom_waves_requests/waves_wide_gals.parquet"
     )
@@ -116,7 +124,8 @@ if __name__ == "__main__":
     polygons = read_polygons(polygon_files)
     ghosts = read_ghosts(INFILE_GHOST_MASKS)
     stars = read_gaia_star_mask(INFILE_GAIA_MASKS)
-    waves_s_extras = read_waves_s_extras(INFILE_WAVES_S_EXTRAS)
+    globular_cluster = read_globular_cluster(INFILE_WAVES_SOUTH_GLOBULAR_CLUSTER)
+    large_stars = read_large_stars(INFILE_WAVES_SOUTH_LARGE_STARS)
 
     waves_wide, waves_deep, combined = split_deep_and_wide(INFILE_MOCK_WIDE)
 
@@ -142,12 +151,13 @@ if __name__ == "__main__":
     tic = datetime.datetime.now()
     mask_ghosts = np.array(apply_apertures(ras_comb, decs_comb, ghosts))
     mask_stars = np.array(apply_apertures(ras_comb, decs_comb, stars))
-    mask_waves_s_extras = np.array(apply_apertures(ras_comb, decs_comb, waves_s_extras))
+    mask_globular_cluster = np.array(apply_apertures(ras_comb, decs_comb, globular_cluster))
+    mask_large_stars = np.array(apply_apertures(ras_comb, decs_comb, large_stars))
     mask_polygons = np.array(apply_polygons(ras_comb, decs_comb, polygons))
     toc = datetime.datetime.now()
     print(f"time: {toc - tic}")
 
-    regions = np.array([mask_stars, mask_ghosts, mask_polygons, mask_waves_s_extras])
+    regions = np.array([mask_stars, mask_ghosts, mask_polygons, mask_globular_cluster, mask_large_stars])
     masked = np.array([any(region) for region in regions.T])
     not_masked = ~masked
 
