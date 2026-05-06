@@ -164,7 +164,7 @@ if __name__ == "__main__":
     regions = np.array(
         [
             mask_stars,
-            mask_ghosts,
+            # mask_ghosts,
             mask_polygons,
             mask_globular_cluster,
             mask_large_stars,
@@ -173,59 +173,60 @@ if __name__ == "__main__":
     masked = np.array([any(region) for region in regions.T])
     not_masked = ~masked
     combined = combined.with_columns(pl.Series("masked", masked))
+    combined = combined.with_columns(pl.Series("ghosted", mask_ghosts))
     combined.write_parquet("combined.parquet")
 
-    cloud_unmasked = create_pv_cloud(
-        ras_comb[not_masked], decs_comb[not_masked], zcos_comb[not_masked]
-    )
-    cloud_masked = create_pv_cloud(
-        ras_comb[masked], decs_comb[masked], zcos_comb[masked]
-    )
-    cloud_deep = create_pv_cloud(ras_deep, decs_deep, zcos_deep)
-    plotter = pv.Plotter()
-    plotter.add_points(
-        cloud_unmasked,
-        color="black",
-        point_size=1.0,
-        render_points_as_spheres=False,
-        label="Unmasked",
-    )
-    plotter.add_points(
-        cloud_masked,
-        color="red",
-        point_size=1.0,
-        render_points_as_spheres=False,
-        label="Masked",
-    )
-    plotter.add_title("Galaxy Distribution (Black=Unmasked, Red=Masked)", font_size=12)
-    plotter.add_legend()
-    plotter.show_axes()
-    plotter.show()
-
-    plotter = pv.Plotter()
-    plotter.add_points(
-        cloud_masked,
-        color="red",
-        point_size=3,
-        render_points_as_spheres=False,
-        label="Masked",
-    )
-    plotter.show()
-
-    plotter = pv.Plotter()
-    plotter.add_points(
-        cloud_unmasked,
-        color="black",
-        point_size=1.0,
-        render_points_as_spheres=False,
-        label="Unmasked",
-    )
-    plotter.add_points(
-        cloud_deep,
-        color="red",
-        point_size=1.0,
-        render_points_as_spheres=False,
-        label="Masked",
-    )
-    plotter.add_title("Galaxy Distribution (Black=Unmasked, Red=Masked)", font_size=12)
-    plotter.show()
+    # cloud_unmasked = create_pv_cloud(
+    #     ras_comb[not_masked], decs_comb[not_masked], zcos_comb[not_masked]
+    # )
+    # cloud_masked = create_pv_cloud(
+    #     ras_comb[masked], decs_comb[masked], zcos_comb[masked]
+    # )
+    # cloud_deep = create_pv_cloud(ras_deep, decs_deep, zcos_deep)
+    # plotter = pv.Plotter()
+    # plotter.add_points(
+    #     cloud_unmasked,
+    #     color="black",
+    #     point_size=1.0,
+    #     render_points_as_spheres=False,
+    #     label="Unmasked",
+    # )
+    # plotter.add_points(
+    #     cloud_masked,
+    #     color="red",
+    #     point_size=1.0,
+    #     render_points_as_spheres=False,
+    #     label="Masked",
+    # )
+    # plotter.add_title("Galaxy Distribution (Black=Unmasked, Red=Masked)", font_size=12)
+    # plotter.add_legend()
+    # plotter.show_axes()
+    # plotter.show()
+    #
+    # plotter = pv.Plotter()
+    # plotter.add_points(
+    #     cloud_masked,
+    #     color="red",
+    #     point_size=3,
+    #     render_points_as_spheres=False,
+    #     label="Masked",
+    # )
+    # plotter.show()
+    #
+    # plotter = pv.Plotter()
+    # plotter.add_points(
+    #     cloud_unmasked,
+    #     color="black",
+    #     point_size=1.0,
+    #     render_points_as_spheres=False,
+    #     label="Unmasked",
+    # )
+    # plotter.add_points(
+    #     cloud_deep,
+    #     color="red",
+    #     point_size=1.0,
+    #     render_points_as_spheres=False,
+    #     label="Masked",
+    # )
+    # plotter.add_title("Galaxy Distribution (Black=Unmasked, Red=Masked)", font_size=12)
+    # plotter.show()
